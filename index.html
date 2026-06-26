@@ -86,26 +86,39 @@ async function load(){
   const [rows, alerts, quota] = await Promise.all([
     q(`token_audit?usage_date=eq.${d}&select=machine_id,machine_name,project_slug,service_name,tokens_used&order=tokens_used.desc`),
     q(`token_alerts?order=created_at.desc&limit=12&select=created_at,machine_id,project_slug,service_name,severity,message`),
-    q(`token_quota?select=service_name,pct,note,source,recorded_at&order=service_name,source`)
+    q(`token_quota?select=service_name,pct,note,source,cap,anchor_date,recorded_at&order=service_name,source`)
   ]);
+  // 全機今日各 service 總量（額度即時估算用，數據一上就增）
+  const svcToday = {};
+  rows.forEach(r=>{ svcToday[r.service_name]=(svcToday[r.service_name]||0)+r.tokens_used; });
   // 額度儀表板（剩餘% gauge）：每 service 一個，優先真值(manual)，有估算(auto)就附註
   if(quota.length){
     document.getElementById("quota-panel").style.display="";
     const bySvc={};
     quota.forEach(x=>{ (bySvc[x.service_name]=bySvc[x.service_name]||{})[x.source]=x; });
     document.getElementById("quota").innerHTML = Object.entries(bySvc).map(([svc,m])=>{
-      const primary = m.manual || m.auto;            // 真值優先
-      const rem = Math.max(0, Math.min(100, 100 - primary.pct));
+      const man = m.manual;
+      let usedPct, live=false, anchorTxt="";
+      if(man && man.cap){
+        // 即時估算：全機今日總量 ÷ cap → 隨上傳數據自動增加（剩餘減少）
+        usedPct = 100*(svcToday[svc]||0)/man.cap;
+        live = true;
+        anchorTxt = `真值 剩${Math.round(100-man.pct)}%（校準 ${man.anchor_date||(man.recorded_at||'').slice(5,10)}）`;
+      } else {
+        usedPct = (man || m.auto).pct;       // 無 cap → 靜態真值
+      }
+      const rem = Math.max(0, Math.min(100, Math.round(100 - usedPct)));
       const color = rem>=50 ? "var(--ok)" : rem>=20 ? "var(--warn)" : "var(--danger)";
-      const srcLabel = m.manual ? '<span class="badge">真值</span>' : '<span class="badge est">估算</span>';
-      const est = (m.auto && m.manual) ? ` · 估算剩 ${Math.round(100-m.auto.pct)}%` : "";
-      const when = (primary.recorded_at||"").slice(5,16).replace("T"," ");
+      const badge = live ? '<span class="badge">即時估算</span>'
+                    : (man ? '<span class="badge">真值</span>' : '<span class="badge est">估算</span>');
+      const when = ((man||m.auto).recorded_at||"").slice(5,16).replace("T"," ");
+      const usedTok = live ? ` · 今日全機 ${((svcToday[svc]||0)/1e6).toFixed(1)}M` : "";
       return `<div class="gauge">
-        <div class="top"><span class="svc-name"><span class="svc ${svc}">${svc}</span></span>${srcLabel}</div>
+        <div class="top"><span class="svc-name"><span class="svc ${svc}">${svc}</span></span>${badge}</div>
         <div class="rem" style="color:${color}"><small>剩</small>${rem}%</div>
         <div class="track"><i style="width:${rem}%;background:${color}"></i></div>
-        <div class="sub"><span>已用 ${primary.pct}%${est}</span><span>${when}</span></div>
-        ${primary.note?`<div class="sub" style="margin-top:3px">${primary.note}</div>`:""}
+        <div class="sub"><span>已用 ${Math.round(usedPct)}%${usedTok}</span><span>${when}</span></div>
+        <div class="sub" style="margin-top:3px">${live?anchorTxt:(man&&man.note?man.note:"")}</div>
       </div>`;
     }).join("");
   }
