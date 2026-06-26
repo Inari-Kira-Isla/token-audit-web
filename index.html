@@ -41,6 +41,28 @@
   .gauge .sub{font-size:11.5px;color:var(--sub);display:flex;justify-content:space-between}
   .badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:20px;background:var(--chip);color:var(--accent)}
   .badge.est{background:#f1f5f9;color:#475569}
+  /* tabs */
+  .tabs{display:flex;gap:6px;margin:12px 0 4px}
+  .tab{font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;border:1px solid var(--line);
+    background:#fff;color:var(--sub);cursor:pointer}
+  .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  /* charts */
+  .legend{font-size:11.5px;color:var(--sub);display:flex;gap:14px;margin:2px 0 12px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+  .rowA{display:flex;align-items:center;gap:10px;margin:11px 16px}
+  .rowA .lbl{width:130px;font-size:13px;font-weight:600} .rowA .lbl .s{display:block;color:#9ca3af;font-size:11px;font-weight:400}
+  .barwrap{flex:1;display:flex;align-items:center;gap:10px}
+  .barA{height:24px;border-radius:7px;overflow:hidden;display:flex;min-width:2px}
+  .barA .seg{height:100%} .barA-tot{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+  .mblock{padding:6px 0} .mhead{font-size:13.5px;font-weight:700;margin:10px 16px 8px;display:flex;justify-content:space-between}
+  .mhead .s{color:var(--sub);font-weight:600}
+  .prow{display:flex;align-items:center;gap:8px;margin:6px 16px}
+  .pname{width:120px;font-size:11.5px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ptrack{flex:1;height:11px;background:#eef0f3;border-radius:6px;overflow:hidden}
+  .ptrack i{display:block;height:100%;background:var(--accent);border-radius:6px}
+  .ptrack i.hot{background:var(--danger)}
+  .pval{width:50px;text-align:right;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+  .pval.hot{color:var(--danger);font-weight:800}
   .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
   footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
   @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
@@ -52,6 +74,24 @@
     <div class="meta"><span class="live"></span><span id="updated">載入中…</span></div>
   </header>
 
+  <div class="tabs">
+    <button class="tab on" id="tab-overview" onclick="showTab('overview')">📊 總覽</button>
+    <button class="tab" id="tab-charts" onclick="showTab('charts')">📈 比較圖表</button>
+  </div>
+
+  <div id="view-charts" style="display:none">
+    <section class="panel">
+      <h2>📊 三機總用量比較 <span class="tag">近14日 · codex+claude 堆疊</span></h2>
+      <div class="legend"><span><i style="background:#d97706"></i>Claude</span><span><i style="background:#4338ca"></i>Codex</span></div>
+      <div id="chartA"><div class="empty">載入中…</div></div>
+    </section>
+    <section class="panel">
+      <h2>🗂️ 每機專案分布 <span class="tag">top 8 · 紅=單專案佔該機 &gt;40%</span></h2>
+      <div id="chartB"><div class="empty">載入中…</div></div>
+    </section>
+  </div>
+
+  <div id="view-overview">
   <section class="panel" id="quota-panel" style="display:none">
     <h2>🔋 額度儀表板 <span class="tag">剩餘% · 真值手抄 / 估算自動</span></h2>
     <div id="quota" class="gauges"></div>
@@ -69,6 +109,8 @@
     <table><thead><tr><th>機器</th><th>專案</th><th>服務</th><th class="num">今日 Token</th></tr></thead>
       <tbody id="today-rows"><tr><td class="empty" colspan="4">載入中…</td></tr></tbody></table>
   </section>
+
+  </div><!-- /view-overview -->
 
   <footer id="foot">資料源 token_audit / token_alerts（Supabase, anon 唯讀）· 每 60 秒自動更新</footer>
 
@@ -149,7 +191,52 @@ async function load(){
     : `<tr><td class="empty" colspan="4">今日暫無數據</td></tr>`;
   document.getElementById("updated").textContent = "更新 "+new Date().toLocaleTimeString("zh-HK",{hour:"2-digit",minute:"2-digit"});
 }
-load(); setInterval(load, 60000);
+// ── 比較圖表 tab ──
+const CH_NAMES={"imac-main":"Kira iMac（主）","imac-2":"Kira iMac 2","mac-mini":"Kira Mac mini"};
+const CH_ORDER=["imac-main","imac-2","mac-mini"];
+let curTab="overview";
+function showTab(t){
+  curTab=t;
+  document.getElementById("view-overview").style.display = t==="overview"?"":"none";
+  document.getElementById("view-charts").style.display   = t==="charts"?"":"none";
+  document.getElementById("tab-overview").classList.toggle("on", t==="overview");
+  document.getElementById("tab-charts").classList.toggle("on", t==="charts");
+  if(t==="charts") loadCharts();
+}
+async function loadCharts(){
+  if(!C.url) return;
+  const all = await q(`token_audit?select=machine_id,machine_name,project_slug,service_name,tokens_used&limit=20000`);
+  const mtot={},msvc={},mproj={};
+  all.forEach(r=>{ const m=r.machine_id,t=r.tokens_used;
+    mtot[m]=(mtot[m]||0)+t;
+    (msvc[m]=msvc[m]||{})[r.service_name]=(msvc[m]?.[r.service_name]||0)+t;
+    (mproj[m]=mproj[m]||{})[r.project_slug]=(mproj[m]?.[r.project_slug]||0)+t; });
+  const gmax=Math.max(1,...Object.values(mtot)), CODEX="#4338ca",CLAUDE="#d97706";
+  // A: 總量比較
+  document.getElementById("chartA").innerHTML = CH_ORDER.filter(m=>mtot[m]).map(m=>{
+    const tot=mtot[m],cx=(msvc[m].codex||0),cl=(msvc[m].claude||0),w=72*tot/gmax;
+    return `<div class="rowA"><div class="lbl">${CH_NAMES[m]||m}<span class="s">${Object.keys(mproj[m]).length} 專案</span></div>
+      <div class="barwrap"><div class="barA" style="width:${w.toFixed(1)}%">
+        <span class="seg" style="width:${(100*cl/tot).toFixed(1)}%;background:${CLAUDE}"></span>
+        <span class="seg" style="width:${(100*cx/tot).toFixed(1)}%;background:${CODEX}"></span>
+      </div><span class="barA-tot">${fmt(tot)}</span></div></div>`;
+  }).join("");
+  // B: 每機專案分布 top8
+  document.getElementById("chartB").innerHTML = CH_ORDER.filter(m=>mproj[m]).map(m=>{
+    let items=Object.entries(mproj[m]).sort((a,b)=>b[1]-a[1]);
+    const top=items.slice(0,8), rest=items.slice(8).reduce((s,x)=>s+x[1],0);
+    if(rest) top.push(["其餘",rest]);
+    const pmax=top[0]?top[0][1]:1;
+    const rows=top.map(([p,v],i)=>{ const hot=(i===0&&v/mtot[m]>0.4)?"hot":"";
+      return `<div class="prow"><div class="pname">${p}</div>
+        <div class="ptrack"><i class="${hot}" style="width:${(100*v/pmax).toFixed(1)}%"></i></div>
+        <div class="pval ${hot}">${fmt(v)}</div></div>`;}).join("");
+    return `<div class="mblock"><div class="mhead">${CH_NAMES[m]||m}<span class="s">${fmt(mtot[m])}</span></div>${rows}</div>`;
+  }).join("");
+}
+load();
+if(location.hash==="#charts") showTab("charts");
+setInterval(()=>{ curTab==="overview"?load():loadCharts(); }, 60000);
 </script>
 </body>
 </html>
