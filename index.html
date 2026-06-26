@@ -63,6 +63,12 @@
   .ptrack i.hot{background:var(--danger)}
   .pval{width:50px;text-align:right;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
   .pval.hot{color:var(--danger);font-weight:800}
+  /* machine filter chips */
+  .mfilter{display:flex;flex-wrap:wrap;gap:6px;padding:2px 16px 10px}
+  .chip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:18px;border:1px solid var(--line);
+    background:#fff;color:var(--sub);cursor:pointer}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .chip .n{opacity:.7;font-weight:400;margin-left:4px}
   .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
   footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
   @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
@@ -106,6 +112,7 @@
 
   <section class="panel">
     <h2>📊 今日各機 × 專案 <span class="tag" id="today-label"></span></h2>
+    <div class="mfilter" id="machine-filter"></div>
     <table><thead><tr><th>機器</th><th>專案</th><th>服務</th><th class="num">今日 Token</th></tr></thead>
       <tbody id="today-rows"><tr><td class="empty" colspan="4">載入中…</td></tr></tbody></table>
   </section>
@@ -183,12 +190,11 @@ async function load(){
       <td>${a.machine_id}/${a.project_slug||""}</td><td class="hide-sm"><span class="svc ${a.service_name||""}">${a.service_name||""}</span></td>
       <td class="sev-${a.severity}">${a.message||a.severity}</td></tr>`).join("")+`</tbody></table>`
     : `<div class="empty">✅ 近期無告警</div>`;
-  // 今日表
+  // 今日表（可按機器篩選）
   document.getElementById("today-label").textContent = d;
-  document.getElementById("today-rows").innerHTML = rows.length ?
-    rows.map(r=>`<tr><td>${r.machine_id}</td><td>${r.project_slug}</td>
-      <td><span class="svc ${r.service_name}">${r.service_name}</span></td><td class="num">${r.tokens_used.toLocaleString()}</td></tr>`).join("")
-    : `<tr><td class="empty" colspan="4">今日暫無數據</td></tr>`;
+  lastRows = rows;
+  buildMachineFilter(rows);
+  renderToday();
   document.getElementById("updated").textContent = "更新 "+new Date().toLocaleTimeString("zh-HK",{hour:"2-digit",minute:"2-digit"});
 }
 // ── 比較圖表 tab ──
@@ -233,6 +239,27 @@ async function loadCharts(){
         <div class="pval ${hot}">${fmt(v)}</div></div>`;}).join("");
     return `<div class="mblock"><div class="mhead">${CH_NAMES[m]||m}<span class="s">${fmt(mtot[m])}</span></div>${rows}</div>`;
   }).join("");
+}
+// ── 今日表機器篩選 ──
+let lastRows=[], machineFilter="all";
+function buildMachineFilter(rows){
+  const cnt={}; rows.forEach(r=>cnt[r.machine_id]=(cnt[r.machine_id]||0)+1);
+  const ids=Object.keys(cnt).sort();
+  const btn=(id,label,n)=>`<button class="chip ${machineFilter===id?'on':''}" onclick="setMachineFilter('${id}')">${label}<span class="n">${n}</span></button>`;
+  document.getElementById("machine-filter").innerHTML =
+    btn("all","全部",rows.length) + ids.map(id=>btn(id,id,cnt[id])).join("");
+}
+function renderToday(){
+  const rs = machineFilter==="all" ? lastRows : lastRows.filter(r=>r.machine_id===machineFilter);
+  document.getElementById("today-rows").innerHTML = rs.length ?
+    rs.map(r=>`<tr><td>${r.machine_id}</td><td>${r.project_slug}</td>
+      <td><span class="svc ${r.service_name}">${r.service_name}</span></td><td class="num">${r.tokens_used.toLocaleString()}</td></tr>`).join("")
+    : `<tr><td class="empty" colspan="4">此機今日暫無數據</td></tr>`;
+}
+function setMachineFilter(id){
+  machineFilter=id;
+  document.querySelectorAll("#machine-filter .chip").forEach(c=>c.classList.remove("on"));
+  buildMachineFilter(lastRows); renderToday();
 }
 load();
 if(location.hash==="#charts") showTab("charts");
