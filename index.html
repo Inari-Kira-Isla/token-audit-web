@@ -71,11 +71,57 @@
   .chip .n{opacity:.7;font-weight:400;margin-left:4px}
   .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
   footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
-  @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
   .hbtn{font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--sub);cursor:pointer}
   .hbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   th[onclick]{cursor:pointer} th[onclick]:hover{color:var(--accent)}
+  @media(max-width:640px){
+    body{padding:10px}
+    .machines{grid-template-columns:1fr}
+    .hide-sm{display:none}
+    /* tabs 橫向捲動，唔換行 */
+    .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;gap:6px}
+    .tab{font-size:11px;padding:5px 10px;white-space:nowrap;flex-shrink:0}
+    /* machine filter chips 捲動 */
+    .mfilter{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+    .chip{white-space:nowrap;flex-shrink:0}
+    /* 今日表格 → card 佈局 */
+    #today-tbl thead{display:none}
+    #today-tbl tbody tr{
+      display:grid;
+      grid-template-columns:1fr auto;
+      grid-template-rows:auto auto;
+      padding:10px 14px;gap:3px 8px;
+      border:none;border-top:1px solid var(--line)
+    }
+    #today-tbl tbody td{border:none;padding:0}
+    #today-tbl tbody td:nth-child(1){/* 機器 */
+      grid-column:1/-1;font-size:10px;color:var(--sub);margin-bottom:1px}
+    #today-tbl tbody td:nth-child(2){/* 專案 */
+      font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #today-tbl tbody td:nth-child(3){/* 服務 */
+      text-align:right}
+    #today-tbl tbody td:nth-child(4){/* Token */
+      grid-column:1/-1;text-align:right;
+      font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+    /* 歷史表格 → card 佈局 */
+    #hist-tbl thead{display:none}
+    #hist-tbl tbody tr{
+      display:grid;grid-template-columns:1fr auto;
+      padding:9px 14px;gap:2px 8px;
+      border:none;border-top:1px solid var(--line)
+    }
+    #hist-tbl tbody td{border:none;padding:0}
+    #hist-tbl tbody td:nth-child(1){font-size:10px;color:var(--sub)}
+    #hist-tbl tbody td:nth-child(2){font-size:10px;color:var(--sub);text-align:right}
+    #hist-tbl tbody td:nth-child(3){font-size:13px;font-weight:600;grid-column:1/-1}
+    #hist-tbl tbody td:nth-child(5){grid-column:1/-1;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+    /* 機器卡縮緊 */
+    .mc{padding:12px} .big{font-size:20px}
+    /* panel 標題省行 */
+    .panel h2{font-size:13px;margin:10px 14px 6px}
+  }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
 </head>
 <body>
   <header>
@@ -118,7 +164,7 @@
         </select>
       </div>
       <div id="hist-bar" style="padding:0 4px 8px"></div>
-      <table><thead><tr>
+      <table id="hist-tbl"><thead><tr>
         <th onclick="sortHist('usage_date')">日期 ↕</th>
         <th onclick="sortHist('machine_id')">機器 ↕</th>
         <th>專案</th>
@@ -145,7 +191,7 @@
   <section class="panel">
     <h2>📊 今日各機 × 專案 <span class="tag" id="today-label"></span></h2>
     <div class="mfilter" id="machine-filter"></div>
-    <table><thead><tr><th>機器</th><th>專案</th><th>服務</th><th class="num">今日 Token</th></tr></thead>
+    <table id="today-tbl"><thead><tr><th>機器</th><th>專案</th><th>服務</th><th class="num">今日 Token</th></tr></thead>
       <tbody id="today-rows"><tr><td class="empty" colspan="4">載入中…</td></tr></tbody></table>
   </section>
 
@@ -209,6 +255,8 @@ async function load(){
     byM[r.machine_id].total+=r.tokens_used; byM[r.machine_id][r.service_name]=(byM[r.machine_id][r.service_name]||0)+r.tokens_used; });
   const known = ["imac-main","mac-mini","imac-2"];
   const ids = Array.from(new Set([...known, ...Object.keys(byM)]));
+  // GSAP 機器卡入場
+  const _animMC = ()=>{ if(window.gsap) gsap.from("#machines .mc",{opacity:0,y:18,stagger:.09,duration:.4,ease:"power2.out"}); };
   document.getElementById("machines").innerHTML = ids.map(id=>{
     const m = byM[id]; const on = !!m;
     return `<div class="mc"><h3>${on?"🖥️":"⚪"} ${m?m.name:id}</h3><div class="host">${id}${on?"":" · 未上報"}</div>
@@ -228,6 +276,7 @@ async function load(){
   buildMachineFilter(rows);
   renderToday();
   document.getElementById("updated").textContent = "更新 "+new Date().toLocaleTimeString("zh-HK",{hour:"2-digit",minute:"2-digit"});
+  _animMC();
 }
 // ── 比較圖表 tab ──
 const CH_NAMES={"imac-main":"Kira iMac（主）","imac-2":"Kira iMac 2","mac-mini":"Kira Mac mini"};
@@ -241,6 +290,7 @@ function showTab(t){
   document.getElementById("tab-overview").classList.toggle("on", t==="overview");
   document.getElementById("tab-charts").classList.toggle("on", t==="charts");
   document.getElementById("tab-history").classList.toggle("on", t==="history");
+  if(window.gsap) gsap.from("#view-"+t,{opacity:0,y:10,duration:.3,ease:"power2.out"});
   if(t==="charts") loadCharts();
   if(t==="history"&&!histData.length) loadHistory();
 }
@@ -335,6 +385,7 @@ function renderToday(){
     rs.map(r=>`<tr><td>${r.machine_id}</td><td>${r.project_slug}</td>
       <td><span class="svc ${r.service_name}">${r.service_name}</span></td><td class="num">${r.tokens_used.toLocaleString()}</td></tr>`).join("")
     : `<tr><td class="empty" colspan="4">此機今日暫無數據</td></tr>`;
+  if(window.gsap) gsap.from("#today-rows tr",{opacity:0,y:6,stagger:.02,duration:.25,ease:"power1.out"});
 }
 function setMachineFilter(id){
   machineFilter=id;
