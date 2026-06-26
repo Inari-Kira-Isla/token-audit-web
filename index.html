@@ -30,6 +30,17 @@
   .svc{font-size:11px;padding:1px 7px;border-radius:5px;background:#f1f5f9;color:#475569}
   .svc.codex{background:#eef2ff;color:#4338ca} .svc.claude{background:#fef3c7;color:#92400e}
   .empty{color:var(--sub);font-size:13px;padding:14px 16px}
+  .gauges{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:4px 16px 14px}
+  .gauge{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .gauge .top{display:flex;justify-content:space-between;align-items:baseline}
+  .gauge .svc-name{font-size:14px;font-weight:700}
+  .gauge .rem{font-size:30px;font-weight:800;letter-spacing:-1px}
+  .gauge .rem small{font-size:13px;font-weight:600;color:var(--sub);margin-right:3px}
+  .gauge .track{height:12px;border-radius:8px;background:#eef0f3;overflow:hidden;margin:9px 0 6px}
+  .gauge .track > i{display:block;height:100%;border-radius:8px;transition:width .4s}
+  .gauge .sub{font-size:11.5px;color:var(--sub);display:flex;justify-content:space-between}
+  .badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:20px;background:var(--chip);color:var(--accent)}
+  .badge.est{background:#f1f5f9;color:#475569}
   .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
   footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
   @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
@@ -42,8 +53,8 @@
   </header>
 
   <section class="panel" id="quota-panel" style="display:none">
-    <h2>📉 額度% <span class="tag">手抄 quota_log.py · 真實計費窗口</span></h2>
-    <div id="quota"></div>
+    <h2>🔋 額度儀表板 <span class="tag">剩餘% · 真值手抄 / 估算自動</span></h2>
+    <div id="quota" class="gauges"></div>
   </section>
 
   <section class="machines" id="machines"><div class="mc"><div class="host">載入中…</div></div></section>
@@ -77,17 +88,26 @@ async function load(){
     q(`token_alerts?order=created_at.desc&limit=12&select=created_at,machine_id,project_slug,service_name,severity,message`),
     q(`token_quota?select=service_name,pct,note,source,recorded_at&order=service_name,source`)
   ]);
-  // 額度% banner（真值 manual + 估算 auto 並存）
+  // 額度儀表板（剩餘% gauge）：每 service 一個，優先真值(manual)，有估算(auto)就附註
   if(quota.length){
     document.getElementById("quota-panel").style.display="";
-    document.getElementById("quota").innerHTML =
-      `<table><thead><tr><th>服務</th><th>來源</th><th>已用%</th><th class="hide-sm">時間</th><th>備註</th></tr></thead><tbody>`+
-      quota.map(x=>{const sev=x.pct>=90?"sev-runaway":x.pct>=70?"sev-crit":x.pct>=40?"sev-warn":"";
-        const src=x.source==="auto"?'<span class="svc">估算</span>':'<span class="svc claude">真值</span>';
-        return `<tr><td><span class="svc ${x.service_name}">${x.service_name}</span></td><td>${src}</td>
-        <td class="${sev}" style="font-weight:700">${x.pct}%</td>
-        <td class="hide-sm">${(x.recorded_at||"").slice(5,16).replace("T"," ")}</td><td class="meta">${x.note||""}</td></tr>`;}).join("")+
-      `</tbody></table>`;
+    const bySvc={};
+    quota.forEach(x=>{ (bySvc[x.service_name]=bySvc[x.service_name]||{})[x.source]=x; });
+    document.getElementById("quota").innerHTML = Object.entries(bySvc).map(([svc,m])=>{
+      const primary = m.manual || m.auto;            // 真值優先
+      const rem = Math.max(0, Math.min(100, 100 - primary.pct));
+      const color = rem>=50 ? "var(--ok)" : rem>=20 ? "var(--warn)" : "var(--danger)";
+      const srcLabel = m.manual ? '<span class="badge">真值</span>' : '<span class="badge est">估算</span>';
+      const est = (m.auto && m.manual) ? ` · 估算剩 ${Math.round(100-m.auto.pct)}%` : "";
+      const when = (primary.recorded_at||"").slice(5,16).replace("T"," ");
+      return `<div class="gauge">
+        <div class="top"><span class="svc-name"><span class="svc ${svc}">${svc}</span></span>${srcLabel}</div>
+        <div class="rem" style="color:${color}"><small>剩</small>${rem}%</div>
+        <div class="track"><i style="width:${rem}%;background:${color}"></i></div>
+        <div class="sub"><span>已用 ${primary.pct}%${est}</span><span>${when}</span></div>
+        ${primary.note?`<div class="sub" style="margin-top:3px">${primary.note}</div>`:""}
+      </div>`;
+    }).join("");
   }
   // 機器卡
   const byM = {};
