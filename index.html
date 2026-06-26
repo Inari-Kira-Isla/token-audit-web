@@ -72,6 +72,9 @@
   .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
   footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
   @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
+  .hbtn{font-size:12px;padding:4px 10px;border-radius:14px;border:1px solid var(--line);background:#fff;color:var(--sub);cursor:pointer}
+  .hbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  th[onclick]{cursor:pointer} th[onclick]:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -83,6 +86,7 @@
   <div class="tabs">
     <button class="tab on" id="tab-overview" onclick="showTab('overview')">📊 總覽</button>
     <button class="tab" id="tab-charts" onclick="showTab('charts')">📈 比較圖表</button>
+    <button class="tab" id="tab-history" onclick="showTab('history')">📅 歷史查詢</button>
   </div>
 
   <div id="view-charts" style="display:none">
@@ -94,6 +98,34 @@
     <section class="panel">
       <h2>🗂️ 每機專案分布 <span class="tag">top 8 · 紅=單專案佔該機 &gt;40%</span></h2>
       <div id="chartB"><div class="empty">載入中…</div></div>
+    </section>
+  </div>
+
+  <div id="view-history" style="display:none">
+    <section class="panel">
+      <h2>📅 歷史查詢 — 各日 × 各專案 <span class="tag" id="hist-tag">30 日</span></h2>
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 16px 12px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--sub);font-weight:600">範圍：</span>
+        <button class="hbtn" data-days="7" onclick="setHistDays(7)">7 日</button>
+        <button class="hbtn" data-days="14" onclick="setHistDays(14)">14 日</button>
+        <button class="hbtn on" data-days="30" onclick="setHistDays(30)">30 日</button>
+        <span style="margin-left:12px;font-size:12px;color:var(--sub);font-weight:600">機器：</span>
+        <select id="hist-machine" onchange="renderHistory()" style="font-size:12px;padding:3px 7px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)">
+          <option value="">全部</option>
+          <option value="imac-main">imac-main</option>
+          <option value="imac-2">imac-2</option>
+          <option value="mac-mini">mac-mini</option>
+        </select>
+      </div>
+      <div id="hist-bar" style="padding:0 4px 8px"></div>
+      <table><thead><tr>
+        <th onclick="sortHist('usage_date')">日期 ↕</th>
+        <th onclick="sortHist('machine_id')">機器 ↕</th>
+        <th>專案</th>
+        <th class="hide-sm">服務</th>
+        <th class="num" onclick="sortHist('tokens_used')">Token ↕</th>
+      </tr></thead>
+      <tbody id="hist-rows"><tr><td class="empty" colspan="5">點擊範圍按鈕載入</td></tr></tbody></table>
     </section>
   </div>
 
@@ -205,9 +237,57 @@ function showTab(t){
   curTab=t;
   document.getElementById("view-overview").style.display = t==="overview"?"":"none";
   document.getElementById("view-charts").style.display   = t==="charts"?"":"none";
+  document.getElementById("view-history").style.display  = t==="history"?"":"none";
   document.getElementById("tab-overview").classList.toggle("on", t==="overview");
   document.getElementById("tab-charts").classList.toggle("on", t==="charts");
+  document.getElementById("tab-history").classList.toggle("on", t==="history");
   if(t==="charts") loadCharts();
+  if(t==="history"&&!histData.length) loadHistory();
+}
+// ── 歷史查詢 tab ──
+let histData=[], histDays=30, histSort={key:'tokens_used',asc:false};
+function setHistDays(d){
+  histDays=d;
+  document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('on',+b.dataset.days===d));
+  document.getElementById('hist-tag').textContent=d+' 日';
+  loadHistory();
+}
+async function loadHistory(){
+  if(!C.url) return;
+  const since=new Date(Date.now()-histDays*864e5).toISOString().slice(0,10);
+  document.getElementById('hist-rows').innerHTML='<tr><td class="empty" colspan="5">載入中…</td></tr>';
+  histData=await q(`token_audit?usage_date=gte.${since}&select=usage_date,machine_id,project_slug,service_name,tokens_used&order=usage_date.desc,tokens_used.desc&limit=2000`);
+  renderHistory();
+}
+function renderHistory(){
+  const mc=document.getElementById('hist-machine').value;
+  let rows=mc?histData.filter(r=>r.machine_id===mc):histData;
+  // 各專案累計柱狀圖（top 12）
+  const proj={};
+  rows.forEach(r=>{proj[r.project_slug]=(proj[r.project_slug]||0)+r.tokens_used;});
+  const top=Object.entries(proj).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const pmax=top[0]?top[0][1]:1;
+  document.getElementById('hist-bar').innerHTML=top.length?top.map(([p,v])=>{
+    const w=(100*v/pmax).toFixed(1);
+    const col=v>50e6?'var(--danger)':v>10e6?'var(--warn)':'var(--accent)';
+    return `<div class="prow"><div class="pname" title="${p}">${p}</div>
+      <div class="ptrack"><i style="width:${w}%;background:${col}"></i></div>
+      <div class="pval" style="color:${col};width:60px">${fmt(v)}</div></div>`;
+  }).join(''):'';
+  // 排序明細表
+  rows=[...rows].sort((a,b)=>{
+    if(typeof a[histSort.key]==='number') return histSort.asc?a[histSort.key]-b[histSort.key]:b[histSort.key]-a[histSort.key];
+    return histSort.asc?String(a[histSort.key]).localeCompare(String(b[histSort.key])):String(b[histSort.key]).localeCompare(String(a[histSort.key]));
+  });
+  document.getElementById('hist-rows').innerHTML=rows.length?
+    rows.map(r=>`<tr><td>${r.usage_date}</td><td>${r.machine_id}</td><td>${r.project_slug}</td>
+      <td class="hide-sm"><span class="svc ${r.service_name}">${r.service_name}</span></td>
+      <td class="num">${r.tokens_used.toLocaleString()}</td></tr>`).join('')
+    :'<tr><td class="empty" colspan="5">此範圍無數據</td></tr>';
+}
+function sortHist(key){
+  histSort={key,asc:histSort.key===key?!histSort.asc:false};
+  renderHistory();
 }
 async function loadCharts(){
   if(!C.url) return;
@@ -262,8 +342,8 @@ function setMachineFilter(id){
   buildMachineFilter(lastRows); renderToday();
 }
 load();
-if(location.hash==="#charts") showTab("charts");
-setInterval(()=>{ curTab==="overview"?load():loadCharts(); }, 60000);
+if(location.hash==="#charts"||location.hash==="#history") showTab(location.hash.slice(1));
+setInterval(()=>{ if(curTab==="overview") load(); else if(curTab==="charts") loadCharts(); else if(curTab==="history") loadHistory(); }, 60000);
 </script>
 </body>
 </html>
