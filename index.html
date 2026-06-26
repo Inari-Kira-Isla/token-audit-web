@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token 審計 · 3 機聯動</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1f2430;--sub:#6b7280;--line:#e6e8ec;
+    --ok:#16a34a;--warn:#d97706;--danger:#dc2626;--danger-bg:#fef2f2;--chip:#eef2ff;--accent:#2563eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang TC","Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;padding:18px;max-width:980px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+  h1{font-size:21px;margin:0;letter-spacing:.5px}
+  .meta{color:var(--sub);font-size:12px}
+  .live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px;box-shadow:0 0 0 3px #16a34a22}
+  .machines{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+  .mc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .mc h3{margin:0 0 2px;font-size:14px} .mc .host{color:var(--sub);font-size:11px;margin-bottom:10px}
+  .big{font-size:24px;font-weight:700;letter-spacing:-.5px} .big small{font-size:12px;color:var(--sub);font-weight:500;margin-left:3px}
+  .row{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:8px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 0 4px;margin:14px 0}
+  .panel h2{font-size:14px;margin:12px 16px 8px;display:flex;align-items:center;gap:7px}
+  .tag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--chip);color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 16px;border-top:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  tr.flag{background:var(--danger-bg)} tr.flag td{color:#7f1d1d}
+  .svc{font-size:11px;padding:1px 7px;border-radius:5px;background:#f1f5f9;color:#475569}
+  .svc.codex{background:#eef2ff;color:#4338ca} .svc.claude{background:#fef3c7;color:#92400e}
+  .empty{color:var(--sub);font-size:13px;padding:14px 16px}
+  .sev-runaway{color:var(--danger);font-weight:700} .sev-crit{color:#b91c1c} .sev-warn{color:var(--warn)}
+  footer{color:var(--sub);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
+  @media(max-width:640px){.machines{grid-template-columns:1fr}.hide-sm{display:none}}
+</style>
+</head>
+<body>
+  <header>
+    <div><h1>🪙 Token 審計 · 3 機聯動</h1><div class="meta">Codex + Claude · 每專案歸屬 · 排除 cache_read</div></div>
+    <div class="meta"><span class="live"></span><span id="updated">載入中…</span></div>
+  </header>
+
+  <section class="panel" id="quota-panel" style="display:none">
+    <h2>📉 額度% <span class="tag">手抄 quota_log.py · 真實計費窗口</span></h2>
+    <div id="quota"></div>
+  </section>
+
+  <section class="machines" id="machines"><div class="mc"><div class="host">載入中…</div></div></section>
+
+  <section class="panel">
+    <h2>🔥 近期告警 <span class="tag">runaway / burst / spike</span></h2>
+    <div id="alerts"><div class="empty">載入中…</div></div>
+  </section>
+
+  <section class="panel">
+    <h2>📊 今日各機 × 專案 <span class="tag" id="today-label"></span></h2>
+    <table><thead><tr><th>機器</th><th>專案</th><th>服務</th><th class="num">今日 Token</th></tr></thead>
+      <tbody id="today-rows"><tr><td class="empty" colspan="4">載入中…</td></tr></tbody></table>
+  </section>
+
+  <footer id="foot">資料源 token_audit / token_alerts（Supabase, anon 唯讀）· 每 60 秒自動更新</footer>
+
+<script src="config.js"></script>
+<script>
+const C = window.TA_CONFIG || {};
+const H = {apikey:C.anonKey, Authorization:"Bearer "+C.anonKey};
+const fmt = n => n>=1e6 ? (n/1e6).toFixed(1)+"M" : n>=1e3 ? (n/1e3).toFixed(0)+"k" : n;
+const today = () => new Date().toISOString().slice(0,10);
+async function q(path){ const r = await fetch(C.url+"/rest/v1/"+path,{headers:H}); return r.ok? r.json():[]; }
+
+async function load(){
+  if(!C.url){ document.getElementById("updated").textContent="未設定 config.js"; return; }
+  const d = today();
+  const [rows, alerts, quota] = await Promise.all([
+    q(`token_audit?usage_date=eq.${d}&select=machine_id,machine_name,project_slug,service_name,tokens_used&order=tokens_used.desc`),
+    q(`token_alerts?order=created_at.desc&limit=12&select=created_at,machine_id,project_slug,service_name,severity,message`),
+    q(`token_quota?select=service_name,pct,note,source,recorded_at&order=service_name,source`)
+  ]);
+  // 額度% banner（真值 manual + 估算 auto 並存）
+  if(quota.length){
+    document.getElementById("quota-panel").style.display="";
+    document.getElementById("quota").innerHTML =
+      `<table><thead><tr><th>服務</th><th>來源</th><th>已用%</th><th class="hide-sm">時間</th><th>備註</th></tr></thead><tbody>`+
+      quota.map(x=>{const sev=x.pct>=90?"sev-runaway":x.pct>=70?"sev-crit":x.pct>=40?"sev-warn":"";
+        const src=x.source==="auto"?'<span class="svc">估算</span>':'<span class="svc claude">真值</span>';
+        return `<tr><td><span class="svc ${x.service_name}">${x.service_name}</span></td><td>${src}</td>
+        <td class="${sev}" style="font-weight:700">${x.pct}%</td>
+        <td class="hide-sm">${(x.recorded_at||"").slice(5,16).replace("T"," ")}</td><td class="meta">${x.note||""}</td></tr>`;}).join("")+
+      `</tbody></table>`;
+  }
+  // 機器卡
+  const byM = {};
+  rows.forEach(r=>{ (byM[r.machine_id] = byM[r.machine_id]||{name:r.machine_name||r.machine_id,total:0,codex:0,claude:0});
+    byM[r.machine_id].total+=r.tokens_used; byM[r.machine_id][r.service_name]=(byM[r.machine_id][r.service_name]||0)+r.tokens_used; });
+  const known = ["imac-main","mac-mini","imac-2"];
+  const ids = Array.from(new Set([...known, ...Object.keys(byM)]));
+  document.getElementById("machines").innerHTML = ids.map(id=>{
+    const m = byM[id]; const on = !!m;
+    return `<div class="mc"><h3>${on?"🖥️":"⚪"} ${m?m.name:id}</h3><div class="host">${id}${on?"":" · 未上報"}</div>
+      <div class="big">${m?fmt(m.total):"—"}<small>今日</small></div>
+      <div class="row"><span>codex ${m?fmt(m.codex||0):"—"}</span><span>claude ${m?fmt(m.claude||0):"—"}</span></div></div>`;
+  }).join("");
+  // 告警
+  document.getElementById("alerts").innerHTML = alerts.length ?
+    `<table><thead><tr><th>時間</th><th>機/專案</th><th class="hide-sm">服務</th><th>內容</th></tr></thead><tbody>`+
+    alerts.map(a=>`<tr><td>${a.created_at.slice(5,16).replace("T"," ")}</td>
+      <td>${a.machine_id}/${a.project_slug||""}</td><td class="hide-sm"><span class="svc ${a.service_name||""}">${a.service_name||""}</span></td>
+      <td class="sev-${a.severity}">${a.message||a.severity}</td></tr>`).join("")+`</tbody></table>`
+    : `<div class="empty">✅ 近期無告警</div>`;
+  // 今日表
+  document.getElementById("today-label").textContent = d;
+  document.getElementById("today-rows").innerHTML = rows.length ?
+    rows.map(r=>`<tr><td>${r.machine_id}</td><td>${r.project_slug}</td>
+      <td><span class="svc ${r.service_name}">${r.service_name}</span></td><td class="num">${r.tokens_used.toLocaleString()}</td></tr>`).join("")
+    : `<tr><td class="empty" colspan="4">今日暫無數據</td></tr>`;
+  document.getElementById("updated").textContent = "更新 "+new Date().toLocaleTimeString("zh-HK",{hour:"2-digit",minute:"2-digit"});
+}
+load(); setInterval(load, 60000);
+</script>
+</body>
+</html>
