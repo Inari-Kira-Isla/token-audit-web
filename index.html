@@ -298,11 +298,11 @@ async function load(){
     document.getElementById("quota").innerHTML = Object.entries(bySvc).map(([svc,m])=>{
       const man=m.manual; let usedPct,live=false,anchorTxt="";
       if(man&&man.cap){
-        // 從錨點剩餘%出發，加上今日增量（錨點當日已含，不再重算）
-        const anchorUsed = 100 - man.pct;
+        // man.pct = 已用%（collect.py: pct = used/cap*100）
+        // 從錨點已用%出發，疊加今日增量（避免每日早上歸零假象）
         const todayAdd = 100*(svcToday[svc]||0)/man.cap;
-        usedPct = anchorUsed + todayAdd; live=true;
-        anchorTxt=`真值 剩${Math.round(man.pct)}%（校準 ${man.anchor_date||(man.recorded_at||'').slice(5,10)}）`;
+        usedPct = man.pct + todayAdd; live=true;
+        anchorTxt=`真值 剩${Math.round(100-man.pct)}%（校準 ${man.anchor_date||(man.recorded_at||'').slice(5,10)}）`;
       } else { usedPct=(man||m.auto).pct; }
       const rem=Math.max(0,Math.min(100,Math.round(100-usedPct)));
       const color=rem>=50?"var(--ok)":rem>=20?"var(--warn)":"var(--danger)";
