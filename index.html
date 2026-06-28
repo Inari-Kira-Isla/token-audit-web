@@ -70,10 +70,33 @@
   .badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:20px;background:var(--chip);color:var(--accent)}
   .badge.est{background:#f1f5f9;color:#475569}
   /* ── Tabs ── */
-  .tabs{display:flex;gap:6px;margin:12px 0 4px}
+  .tabs{display:flex;gap:6px;margin:12px 0 4px;flex-wrap:wrap}
   .tab{font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;border:1px solid var(--line);
     background:var(--card);color:var(--sub);cursor:pointer}
   .tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  /* ── 消耗分析 tab ── */
+  .audit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 14px}
+  @media(max-width:680px){.audit-grid{grid-template-columns:1fr}}
+  .audit-card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .audit-card h3{font-size:13px;font-weight:700;margin:0;padding:11px 14px 9px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px}
+  .arow{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-top:1px solid var(--line)}
+  .arow:first-of-type{border-top:none}
+  .aicon{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px}
+  .aicon.high{background:#fef2f2} .aicon.med{background:#fff7ed} .aicon.low{background:#f0fdf4} .aicon.none{background:#f1f5f9}
+  [data-theme="dark"] .aicon.high{background:#2d1f1f} [data-theme="dark"] .aicon.med{background:#2d2410}
+  [data-theme="dark"] .aicon.low{background:#14291f} [data-theme="dark"] .aicon.none{background:#2a2d3a}
+  .ainfo{flex:1;min-width:0}
+  .aname{font-size:13px;font-weight:700;color:var(--ink)}
+  .adesc{font-size:11px;color:var(--sub);margin-top:1px;line-height:1.4}
+  .abadges{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .abadge{font-size:10px;font-weight:600;padding:1px 7px;border-radius:12px}
+  .abadge.opus{background:#ede9fe;color:#5b21b6} .abadge.sonnet{background:#fef3c7;color:#92400e}
+  .abadge.haiku{background:#ecfdf5;color:#065f46} .abadge.codex{background:#eef2ff;color:#4338ca}
+  .abadge.none{background:#f1f5f9;color:#6b7280} .abadge.sched{background:#f0f9ff;color:#0369a1}
+  .abadge.user{background:#fdf4ff;color:#86198f}
+  .acost{font-size:12px;font-weight:700;text-align:right;white-space:nowrap;padding-top:2px}
+  .acost.high{color:var(--danger)} .acost.med{color:var(--warn)} .acost.low{color:var(--ok)} .acost.none{color:var(--sub)}
+  .audit-note{font-size:11.5px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;line-height:1.6}
   /* ── 圖表 ── */
   .legend{font-size:11.5px;color:var(--sub);display:flex;gap:14px;margin:2px 0 12px}
   .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
@@ -161,7 +184,68 @@
     <button class="tab on" id="tab-overview" onclick="showTab('overview')">📊 總覽</button>
     <button class="tab" id="tab-charts" onclick="showTab('charts')">📈 比較圖表</button>
     <button class="tab" id="tab-history" onclick="showTab('history')">📅 歷史查詢</button>
+    <button class="tab" id="tab-audit" onclick="showTab('audit')">🔧 消耗分析</button>
   </div>
+
+  <!-- 消耗分析 tab -->
+  <div id="view-audit" style="display:none">
+    <p class="audit-note">
+      ℹ️ 本頁記錄 <strong>imac-main</strong> 所有 Token 消耗來源（固定排程 + 按需）。<br>
+      消耗等級：🔴 高（每次 &gt;5M）&nbsp;&nbsp;🟡 中（1–5M）&nbsp;&nbsp;🟢 低（&lt;1M）&nbsp;&nbsp;⚪ 零（無 AI 調用）&nbsp;&nbsp;｜最後更新：2026-06-28
+    </p>
+    <div class="audit-grid">
+      <div class="audit-card">
+        <h3>⏰ 固定排程消耗 <span class="tag">LaunchAgent 自動觸發</span></h3>
+        <div class="arow"><div class="aicon high">🔁</div><div class="ainfo"><div class="aname">KG 自動閉環 (kg_autoloop)</div><div class="adesc">自驗 5 條 facts → 補缺口研究 → 蒸餾入庫，含 /auto-research 完整流程</div><div class="abadges"><span class="abadge sched">每日 04:30</span><span class="abadge opus">Opus（自驗）</span><span class="abadge haiku">Haiku（研究）</span><span class="abadge codex">Codex（對手）</span></div></div><div class="acost high">🔴 高</div></div>
+        <div class="arow"><div class="aicon high">📰</div><div class="ainfo"><div class="aname">雙軌 AI 日報 (macau_ai_daily)</div><div class="adesc">Track A（全球 AI 知識）或 Track B（澳門產業），輪流生成完整研究報告</div><div class="abadges"><span class="abadge sched">每日 09:00</span><span class="abadge sonnet">Sonnet（報告生成）</span></div></div><div class="acost high">🔴 高</div></div>
+        <div class="arow"><div class="aicon med">📋</div><div class="ainfo"><div class="aname">商業簡報 (kg_business_brief)</div><div class="adesc">從 KG 抽取供應鏈/價格/政策 facts，合成週度採購決策簡報</div><div class="abadges"><span class="abadge sched">每週一 06:00</span><span class="abadge opus">Opus（合成）</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon none">📊</div><div class="ainfo"><div class="aname">KG 週度報告 (kg_weekly_report)</div><div class="adesc">純 Python 統計知識圖譜成長、缺口分析、導航排隊。無 AI 調用</div><div class="abadges"><span class="abadge sched">每週五 17:00</span><span class="abadge none">無 AI</span></div></div><div class="acost none">⚪ 零</div></div>
+        <div class="arow"><div class="aicon none">💹</div><div class="ainfo"><div class="aname">定價監測 (kg_price_monitor)</div><div class="adesc">拉 UN Comtrade 官方 API 貿易量/單價，寫入時序庫。無 AI</div><div class="abadges"><span class="abadge sched">每週一 05:30</span><span class="abadge none">純 API，零 Token</span></div></div><div class="acost none">⚪ 零</div></div>
+        <div class="arow"><div class="aicon none">🗄️</div><div class="ainfo"><div class="aname">政府資料備份 (gov_backup)</div><div class="adesc">增量下載 e-Stat + UN Comtrade 原始檔到本地封存。無 AI</div><div class="abadges"><span class="abadge sched">每月 1 日 05:00</span><span class="abadge none">純下載，零 Token</span></div></div><div class="acost none">⚪ 零</div></div>
+        <div class="arow"><div class="aicon none">🔍</div><div class="ainfo"><div class="aname">KG 健康監控 (kg_growth_monitor)</div><div class="adesc">偵測 KG 增長停滯、卡死進程自動殺。寫 macOS 通知，無 AI</div><div class="abadges"><span class="abadge sched">每日 09:00</span><span class="abadge none">無 AI</span></div></div><div class="acost none">⚪ 零</div></div>
+        <div class="arow"><div class="aicon none">🔄</div><div class="ainfo"><div class="aname">CloudPipe 同步 + Token 收集器</div><div class="adesc">git pull 同步指令集 + 每小時讀取 JSONL/SQLite 上報 Supabase。無 AI</div><div class="abadges"><span class="abadge sched">每小時</span><span class="abadge none">純 git + Python，零 Token</span></div></div><div class="acost none">⚪ 零</div></div>
+        <div class="arow"><div class="aicon none">👁️</div><div class="ainfo"><div class="aname">Athena Watchdog（常駐）</div><div class="adesc">監控 workspace 目錄變化 → 觸發本地 GGUF 向量化。無雲端 Token</div><div class="abadges"><span class="abadge sched">常駐</span><span class="abadge none">本地 GGUF</span></div></div><div class="acost none">⚪ 零</div></div>
+      </div>
+      <div class="audit-card">
+        <h3>👤 按需消耗 <span class="tag">用戶 / 事件觸發</span></h3>
+        <div class="arow"><div class="aicon high">💬</div><div class="ainfo"><div class="aname">Claude Code 對話</div><div class="adesc">用戶手動開啟對話，依對話長度與任務複雜度消耗。最大變數</div><div class="abadges"><span class="abadge user">用戶觸發</span><span class="abadge sonnet">Sonnet 4.6（預設）</span><span class="abadge opus">Opus（重要子任務）</span></div></div><div class="acost high">🔴 高</div></div>
+        <div class="arow"><div class="aicon high">🔬</div><div class="ainfo"><div class="aname">/auto-research（手動觸發）</div><div class="adesc">多代理平行研究引擎，生成 3 萬字+深度報告，每份 30–60 分鐘</div><div class="abadges"><span class="abadge user">用戶觸發</span><span class="abadge haiku">Haiku（研究代理）</span><span class="abadge sonnet">Sonnet（綜合）</span><span class="abadge codex">Codex（輔助）</span></div></div><div class="acost high">🔴 高</div></div>
+        <div class="arow"><div class="aicon high">📚</div><div class="ainfo"><div class="aname">/research（深度研究引擎）</div><div class="adesc">Opus 4.8 驅動的多層研究，含網路搜尋、平行子代理、對抗驗證</div><div class="abadges"><span class="abadge user">用戶觸發</span><span class="abadge opus">Opus 4.8</span></div></div><div class="acost high">🔴 高</div></div>
+        <div class="arow"><div class="aicon med">✅</div><div class="ainfo"><div class="aname">KG 對抗自驗 (kg_adversarial_verify)</div><div class="adesc">每條 fact 派 Opus + Codex 兩模型交叉反駁，autoloop Phase A 每日觸發 5 條</div><div class="abadges"><span class="abadge sched">autoloop 觸發</span><span class="abadge opus">Opus × 2</span><span class="abadge codex">Codex × 1</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon med">🏷️</div><div class="ainfo"><div class="aname">CEO 品牌研究觸發器</div><div class="adesc">在 brand_research_requests.md 新增 - [ ] 需求，autoloop Phase C.5 自動偵測啟動</div><div class="abadges"><span class="abadge user">CEO 寫檔觸發</span><span class="abadge haiku">Haiku（研究）</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon low">🧠</div><div class="ainfo"><div class="aname">知識蒸餾 (distill_report.py)</div><div class="adesc">將研究報告蒸餾為三元組 facts 入庫，通常跟隨研究任務自動觸發</div><div class="abadges"><span class="abadge sched">研究後觸發</span><span class="abadge haiku">Haiku（蒸餾）</span></div></div><div class="acost low">🟢 低</div></div>
+        <div class="arow"><div class="aicon low">⚡</div><div class="ainfo"><div class="aname">codex exec（臨時分析）</div><div class="adesc">對 Claude 結論做交叉驗證、大規模程式碼掃描。用戶或腳本觸發</div><div class="abadges"><span class="abadge user">用戶 / 腳本觸發</span><span class="abadge codex">Codex CLI</span></div></div><div class="acost low">🟢 低</div></div>
+        <h3 style="border-top:1px solid var(--line);margin-top:2px">📐 每日固定底線估算 <span class="tag">imac-main</span></h3>
+        <div style="padding:4px 14px 12px">
+          <table style="font-size:12px">
+            <thead><tr><th>來源</th><th>模型</th><th class="num">估算/次</th><th class="num">加權每日</th></tr></thead>
+            <tbody>
+              <tr><td>KG 自動閉環研究</td><td>Haiku</td><td class="num">~8M</td><td class="num" style="color:var(--danger);font-weight:800">~8M</td></tr>
+              <tr><td>雙軌 AI 日報</td><td>Sonnet</td><td class="num">~3M</td><td class="num" style="color:var(--warn)">~3M</td></tr>
+              <tr><td>KG 對抗自驗（5條）</td><td>Opus+Codex</td><td class="num">~300k/條</td><td class="num" style="color:var(--warn)">~1.5M</td></tr>
+              <tr><td>商業簡報</td><td>Opus</td><td class="num">~1M/週</td><td class="num" style="color:var(--ok)">~140k</td></tr>
+              <tr style="border-top:2px solid var(--line)"><td><strong>固定底線合計</strong></td><td>—</td><td class="num">—</td><td class="num" style="color:var(--danger);font-weight:800;font-size:13px">~12.6M/日</td></tr>
+            </tbody>
+          </table>
+          <div style="font-size:10.5px;color:var(--sub);margin-top:8px;line-height:1.5">
+            ⚠️ 若超出告警閾值，優先執行：<code>echo 0 &gt; ~/scripts/.research_quota</code>（停止每日研究，節省 ~8M/日）
+          </div>
+        </div>
+      </div>
+    </div>
+    <section class="panel">
+      <h2>💡 節流優化建議 <span class="tag">操作參考</span></h2>
+      <table>
+        <thead><tr><th>建議</th><th class="num">預計節省</th><th>操作方式</th></tr></thead>
+        <tbody>
+          <tr><td>停止每日自動研究</td><td class="num" style="color:var(--danger)">~8M/日</td><td><code>echo 0 &gt; ~/scripts/.research_quota</code></td></tr>
+          <tr><td>autoloop 自驗從5條降到2條</td><td class="num" style="color:var(--warn)">~900k/日</td><td>修改 <code>kg_autoloop.sh</code> 的 <code>--limit 5</code> 為 <code>--limit 2</code></td></tr>
+          <tr><td>商業簡報改用 Sonnet 替代 Opus</td><td class="num" style="color:var(--ok)">~80%成本</td><td>修改 <code>kg_business_brief.py</code> 的 model 參數</td></tr>
+          <tr><td>macau_ai_daily 改每2日一次</td><td class="num" style="color:var(--warn)">~1.5M/日</td><td>修改 LaunchAgent plist 加 <code>Weekday</code> 條件</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div><!-- /view-audit -->
 
   <!-- 比較圖表 tab -->
   <div id="view-charts" style="display:none">
@@ -370,7 +454,7 @@ const CH_ORDER=["imac-main","imac-2","mac-mini"];
 let curTab="overview";
 function showTab(t){
   curTab=t;
-  ["overview","charts","history"].forEach(v=>{
+  ["overview","charts","history","audit"].forEach(v=>{
     document.getElementById("view-"+v).style.display=v===t?"":"none";
     document.getElementById("tab-"+v).classList.toggle("on",v===t);
   });
