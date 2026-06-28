@@ -129,6 +129,23 @@
     background:var(--card);color:var(--sub);cursor:pointer}
   .hbtn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
   th[onclick]{cursor:pointer} th[onclick]:hover{color:var(--accent)}
+  /* ── 週規劃 ── */
+  .wk-row{display:grid;grid-template-columns:36px 1fr 64px;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid var(--line)}
+  .wk-row:first-child{border-top:none}
+  .wk-row.today-row{background:#eef5ff}
+  [data-theme="dark"] .wk-row.today-row{background:#141d35}
+  .wk-lbl{font-size:11px;font-weight:700;color:var(--sub);text-align:center;line-height:1.3}
+  .wk-lbl.cur{color:var(--accent)}
+  .wk-barwrap{position:relative;height:18px;border-radius:7px;background:#eef0f3;overflow:visible}
+  [data-theme="dark"] .wk-barwrap{background:var(--line)}
+  .wk-bar{position:absolute;top:0;left:0;height:100%;border-radius:7px;overflow:hidden;display:flex}
+  .wk-bar-prev{position:absolute;bottom:-5px;left:0;height:3px;border-radius:2px;background:rgba(128,128,128,.3)}
+  .wk-val{font-size:12px;font-weight:700;font-family:var(--num-font);text-align:right;white-space:nowrap}
+  .wk-advice-row{display:flex;gap:10px;padding:9px 16px;border-top:1px solid var(--line)}
+  .wk-advice-row:first-child{border-top:none}
+  .wk-advice-ico{font-size:17px;flex-shrink:0;margin-top:2px}
+  .wk-advice-body .ttl{font-size:13px;font-weight:700;margin-bottom:2px}
+  .wk-advice-body p{font-size:13px;margin:0;line-height:1.55;color:var(--sub)}
   /* ── 骨架屏 shimmer ── */
   @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
   .skel{border-radius:6px;background:linear-gradient(90deg,var(--line) 25%,var(--bg) 50%,var(--line) 75%);
@@ -185,6 +202,7 @@
     <button class="tab" id="tab-charts" onclick="showTab('charts')">📈 比較圖表</button>
     <button class="tab" id="tab-history" onclick="showTab('history')">📅 歷史查詢</button>
     <button class="tab" id="tab-audit" onclick="showTab('audit')">🔧 消耗分析</button>
+    <button class="tab" id="tab-weekly" onclick="showTab('weekly')">📅 每週規劃</button>
   </div>
 
   <!-- 消耗分析 tab -->
@@ -307,6 +325,31 @@
       </table>
     </section>
   </div><!-- /view-audit -->
+
+  <!-- 每週規劃 tab -->
+  <div id="view-weekly" style="display:none">
+    <section class="panel">
+      <h2>📅 本週節奏 <span class="tag" id="wk-range-tag">計算中…</span></h2>
+      <div id="wk-gauges" class="gauges"></div>
+    </section>
+    <section class="panel">
+      <h2>📊 每日消耗 <span class="tag">本週(色柱) vs 上週(灰底線)</span></h2>
+      <div id="wk-bars" style="padding-bottom:10px">
+        <div style="padding:14px 16px;color:var(--sub);font-size:13px">載入中…</div>
+      </div>
+      <div class="legend" style="padding:0 16px 12px">
+        <span><i style="background:#d97706"></i>Claude</span>
+        <span><i style="background:#4338ca"></i>Codex</span>
+        <span><i style="background:rgba(128,128,128,.3)"></i>上週同天</span>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>💡 排程建議 <span class="tag">基於本週分佈</span></h2>
+      <div id="wk-advice" style="padding-bottom:6px">
+        <div style="padding:14px 16px;color:var(--sub);font-size:13px">計算中…</div>
+      </div>
+    </section>
+  </div>
 
   <!-- 比較圖表 tab -->
   <div id="view-charts" style="display:none">
@@ -515,13 +558,14 @@ const CH_ORDER=["imac-main","imac-2","mac-mini"];
 let curTab="overview";
 function showTab(t){
   curTab=t;
-  ["overview","charts","history","audit"].forEach(v=>{
+  ["overview","charts","history","audit","weekly"].forEach(v=>{
     document.getElementById("view-"+v).style.display=v===t?"":"none";
     document.getElementById("tab-"+v).classList.toggle("on",v===t);
   });
   if(window.gsap) gsap.from("#view-"+t,{opacity:0,y:10,duration:.3,ease:"power2.out"});
   if(t==="charts") loadCharts();
   if(t==="history"&&!histData.length) loadHistory();
+  if(t==="weekly") loadWeekly();
 }
 
 /* ── 歷史查詢 ── */
@@ -622,9 +666,95 @@ function setMachineFilter(id){
   buildMachineFilter(lastRows); renderToday();
 }
 
+/* ── 每週規劃 ── */
+async function loadWeekly(){
+  if(!C.url) return;
+  const d=today();
+  const base=new Date(d+"T00:00:00Z");
+  const dow=base.getUTCDay();
+  const toMon=dow===0?-6:1-dow;
+  const monDate=new Date(+base+toMon*864e5);
+  const monStr=monDate.toISOString().slice(0,10);
+  const prevMonStr=new Date(+monDate-7*864e5).toISOString().slice(0,10);
+  const sunStr=new Date(+monDate+6*864e5).toISOString().slice(0,10);
+  document.getElementById("wk-range-tag").textContent=`${monStr.slice(5)} — ${sunStr.slice(5)}`;
+  const rows=await q(`token_audit?usage_date=gte.${prevMonStr}&usage_date=lte.${sunStr}&select=usage_date,service_name,tokens_used`);
+  const byDay={};
+  rows.forEach(r=>{
+    if(!byDay[r.usage_date]) byDay[r.usage_date]={claude:0,codex:0};
+    const s=r.service_name==="codex"?"codex":"claude";
+    byDay[r.usage_date][s]+=r.tokens_used;
+  });
+  const dayTot=dt=>(byDay[dt]?.claude||0)+(byDay[dt]?.codex||0);
+  const LABELS=["一","二","三","四","五","六","日"];
+  const days=LABELS.map((_,i)=>{
+    const dt=new Date(+monDate+i*864e5).toISOString().slice(0,10);
+    const prevDt=new Date(+monDate+i*864e5-7*864e5).toISOString().slice(0,10);
+    return{dt,prevDt,label:LABELS[i],isToday:dt===d,isFuture:dt>d};
+  });
+  const maxVal=Math.max(1,...days.flatMap(x=>[dayTot(x.dt),dayTot(x.prevDt)]));
+  const CL="#d97706",CX="#4338ca";
+  document.getElementById("wk-bars").innerHTML=days.map(({dt,prevDt,label,isToday,isFuture})=>{
+    const tot=dayTot(dt),prev=dayTot(prevDt);
+    const cl=byDay[dt]?.claude||0,cx=byDay[dt]?.codex||0;
+    const clPct=tot?100*cl/tot:0,cxPct=tot?100*cx/tot:0;
+    const bw=(100*tot/maxVal).toFixed(1),pw=(100*prev/maxVal).toFixed(1);
+    const valColor=isFuture?"var(--sub)":tot>maxVal*.65?"var(--danger)":"var(--ink)";
+    return `<div class="wk-row ${isToday?"today-row":""}">
+      <div class="wk-lbl ${isToday?"cur":""}">週${label}${isToday?"<div style='font-size:9px;font-weight:400'>今</div>":""}</div>
+      <div class="wk-barwrap">
+        ${prev?`<div class="wk-bar-prev" style="width:${pw}%"></div>`:""}
+        ${isFuture
+          ?`<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--sub)">待</span>`
+          :`<div class="wk-bar" style="width:${bw}%">
+              <span style="width:${clPct.toFixed(1)}%;background:${CL};height:100%"></span>
+              <span style="width:${cxPct.toFixed(1)}%;background:${CX};height:100%"></span>
+            </div>`}
+      </div>
+      <div class="wk-val" style="color:${valColor}">${isFuture?"–":fmt(tot)}</div>
+    </div>`;
+  }).join("");
+  const pastDays=days.filter(x=>!x.isFuture);
+  const weekSoFar=pastDays.reduce((s,x)=>s+dayTot(x.dt),0);
+  const passedN=pastDays.length||1;
+  const dailyAvg=weekSoFar/passedN;
+  const prevWeekTot=days.reduce((s,x)=>s+dayTot(x.prevDt),0);
+  const projTot=Math.round(dailyAvg*7);
+  const diffPct=prevWeekTot?Math.round((weekSoFar-prevWeekTot*passedN/7)/(prevWeekTot/7)*100):0;
+  const lightDay=[...pastDays].filter(x=>dayTot(x.dt)>0).sort((a,b)=>dayTot(a.dt)-dayTot(b.dt))[0];
+  const futureCnt=days.filter(x=>x.isFuture).length;
+  document.getElementById("wk-gauges").innerHTML=`
+    <div class="gauge">
+      <div class="top"><span class="svc-name">本週已消耗</span></div>
+      <div class="rem" style="color:var(--accent)">${fmt(weekSoFar)}</div>
+      <div class="sub"><span>日均 ${fmt(Math.round(dailyAvg))}</span><span>已過 ${passedN}/7 日</span></div>
+    </div>
+    <div class="gauge">
+      <div class="top"><span class="svc-name">預估週末合計</span></div>
+      <div class="rem" style="color:${projTot>prevWeekTot*1.3&&prevWeekTot?"var(--danger)":"var(--ok)"}">${fmt(projTot)}</div>
+      <div class="sub"><span>${prevWeekTot?"vs 上週 "+fmt(prevWeekTot):"上週無數據"}</span>
+        <span style="color:${diffPct>20?"var(--danger)":diffPct<-20?"var(--ok)":"var(--sub)"}">${diffPct>0?"+":""}${diffPct}%</span></div>
+    </div>
+    <div class="gauge">
+      <div class="top"><span class="svc-name">最輕鬆日</span></div>
+      <div class="rem" style="color:var(--ok);font-size:22px">${lightDay?"週"+lightDay.label:"–"}</div>
+      <div class="sub"><span>${lightDay?fmt(dayTot(lightDay.dt)):""}</span><span>排重任務首選</span></div>
+    </div>`;
+  const heavyDays=pastDays.filter(x=>dayTot(x.dt)>dailyAvg*1.3).map(x=>"週"+x.label);
+  const advice=[];
+  if(heavyDays.length) advice.push({ico:"⚡",ttl:"高負載日 — 避開",txt:`${heavyDays.join("、")} 超均值 30%+，避免這幾天再追加批次任務。`});
+  if(lightDay&&!lightDay.isToday) advice.push({ico:"✅",ttl:"空窗日 — 首選",txt:`週${lightDay.label} 最輕（${fmt(dayTot(lightDay.dt))}），適合跑批次爬蟲、全量 sync、知識庫更新。`});
+  if(futureCnt>0) advice.push({ico:"📊",ttl:"週末預算",txt:`按日均 ${fmt(Math.round(dailyAvg))} 推算，剩 ${futureCnt} 天還會消耗 ~${fmt(Math.round(dailyAvg*futureCnt))}。週日前建議跑一次 quota_log.py 確認配額。`});
+  if(projTot>prevWeekTot*1.3&&prevWeekTot>0) advice.push({ico:"⚠️",ttl:"週消耗偏高",txt:`本週預估比上週高 ${Math.round((projTot/prevWeekTot-1)*100)}%，請確認是否有失控排程。`});
+  document.getElementById("wk-advice").innerHTML=advice.length
+    ?advice.map(a=>`<div class="wk-advice-row"><div class="wk-advice-ico">${a.ico}</div>
+        <div class="wk-advice-body"><div class="ttl">${a.ttl}</div><p>${a.txt}</p></div></div>`).join("")
+    :`<div style="padding:14px 16px;color:var(--sub);font-size:13px">本週數據尚不足，明天再看趨勢更準確。</div>`;
+}
+
 load();
-if(location.hash==="#charts"||location.hash==="#history") showTab(location.hash.slice(1));
-setInterval(()=>{ if(curTab==="overview") load(); else if(curTab==="charts") loadCharts(); else if(curTab==="history") loadHistory(); },60000);
+if(["charts","history","weekly"].includes(location.hash.slice(1))) showTab(location.hash.slice(1));
+setInterval(()=>{ if(curTab==="overview") load(); else if(curTab==="charts") loadCharts(); else if(curTab==="history") loadHistory(); else if(curTab==="weekly") loadWeekly(); },60000);
 </script>
 </body>
 </html>
