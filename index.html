@@ -189,16 +189,59 @@
 
   <!-- 消耗分析 tab -->
   <div id="view-audit" style="display:none">
+
+    <!-- 模型分工設計 -->
+    <section class="panel" style="margin-bottom:14px">
+      <h2>🧠 模型分工設計 <span class="tag">2026-06-28 優化版</span></h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:8px 14px 14px">
+        <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12px;font-weight:800;color:#5b21b6;margin-bottom:6px">🟣 Claude Opus</div>
+          <div style="font-size:11px;color:var(--sub);line-height:1.6">
+            <strong>決策推理 · 對抗驗證</strong><br>
+            • kg_adversarial_verify（2次/fact）<br>
+            • 用戶觸發 /research 任務<br>
+            ✗ 不再用於大量文字生成
+          </div>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12px;font-weight:800;color:#065f46;margin-bottom:6px">🟢 Claude Haiku</div>
+          <div style="font-size:11px;color:var(--sub);line-height:1.6">
+            <strong>精確蒸餾 · 分類入庫</strong><br>
+            • distill_report.py（唯一保留）<br>
+            • 需要 Claude 格式理解能力<br>
+            ✗ 不再用於研究報告生成
+          </div>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12px;font-weight:800;color:#4338ca;margin-bottom:6px">🔵 Codex CLI</div>
+          <div style="font-size:11px;color:var(--sub);line-height:1.6">
+            <strong>搜尋資料 · 寫程式</strong><br>
+            • codex_research_collector.sh（WebSearch）<br>
+            • kg_adversarial_verify（對手角色）<br>
+            • gstack browser（URL 補源）
+          </div>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:12px;font-weight:800;color:#0369a1;margin-bottom:6px">🔷 MiniMax M2.1</div>
+          <div style="font-size:11px;color:var(--sub);line-height:1.6">
+            <strong>大量文字生成 · 結構化輸出</strong><br>
+            • macau_ai_daily（日報撰寫）<br>
+            • kg_autoloop 研究（報告撰寫）<br>
+            • kg_business_brief（商業簡報）
+          </div>
+        </div>
+      </div>
+    </section>
+
     <p class="audit-note">
-      ℹ️ 本頁記錄 <strong>imac-main</strong> 所有 Token 消耗來源（固定排程 + 按需）。<br>
-      消耗等級：🔴 高（每次 &gt;5M）&nbsp;&nbsp;🟡 中（1–5M）&nbsp;&nbsp;🟢 低（&lt;1M）&nbsp;&nbsp;⚪ 零（無 AI 調用）&nbsp;&nbsp;｜最後更新：2026-06-28
+      ℹ️ 消耗等級：🔴 高（每次 &gt;5M）&nbsp;&nbsp;🟡 中（1–5M）&nbsp;&nbsp;🟢 低（&lt;1M）&nbsp;&nbsp;⚪ 零（無 AI 調用）&nbsp;&nbsp;｜<strong>✅ 2026-06-28 優化後</strong>：研究生成全面替換為 MiniMax，節省 ~11M/日 Claude token
     </p>
     <div class="audit-grid">
       <div class="audit-card">
         <h3>⏰ 固定排程消耗 <span class="tag">LaunchAgent 自動觸發</span></h3>
-        <div class="arow"><div class="aicon high">🔁</div><div class="ainfo"><div class="aname">KG 自動閉環 (kg_autoloop)</div><div class="adesc">自驗 5 條 facts → 補缺口研究 → 蒸餾入庫，含 /auto-research 完整流程</div><div class="abadges"><span class="abadge sched">每日 04:30</span><span class="abadge opus">Opus（自驗）</span><span class="abadge haiku">Haiku（研究）</span><span class="abadge codex">Codex（對手）</span></div></div><div class="acost high">🔴 高</div></div>
-        <div class="arow"><div class="aicon high">📰</div><div class="ainfo"><div class="aname">雙軌 AI 日報 (macau_ai_daily)</div><div class="adesc">Track A（全球 AI 知識）或 Track B（澳門產業），輪流生成完整研究報告</div><div class="abadges"><span class="abadge sched">每日 09:00</span><span class="abadge sonnet">Sonnet（報告生成）</span></div></div><div class="acost high">🔴 高</div></div>
-        <div class="arow"><div class="aicon med">📋</div><div class="ainfo"><div class="aname">商業簡報 (kg_business_brief)</div><div class="adesc">從 KG 抽取供應鏈/價格/政策 facts，合成週度採購決策簡報</div><div class="abadges"><span class="abadge sched">每週一 06:00</span><span class="abadge opus">Opus（合成）</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon med">🔁</div><div class="ainfo"><div class="aname">KG 自動閉環 (kg_autoloop) <span style="color:var(--ok);font-size:10px;font-weight:700">✅ 已優化</span></div><div class="adesc">Phase A 自驗 → Phase C 研究（Codex搜尋+MiniMax撰寫）→ Haiku 蒸餾入庫</div><div class="abadges"><span class="abadge sched">每日 04:30</span><span class="abadge opus">Opus（自驗）</span><span class="abadge codex">Codex（搜尋+對手）</span><span class="abadge" style="background:#f0f9ff;color:#0369a1">MiniMax（撰寫）</span><span class="abadge haiku">Haiku（蒸餾）</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon med">📰</div><div class="ainfo"><div class="aname">雙軌 AI 日報 (macau_ai_daily) <span style="color:var(--ok);font-size:10px;font-weight:700">✅ 已優化</span></div><div class="adesc">Codex 搜尋關鍵詞 → MiniMax M2.1 撰寫完整報告（原 Sonnet 已替換）</div><div class="abadges"><span class="abadge sched">每日 09:00</span><span class="abadge codex">Codex（搜尋）</span><span class="abadge" style="background:#f0f9ff;color:#0369a1">MiniMax（撰寫）</span></div></div><div class="acost med">🟡 中</div></div>
+        <div class="arow"><div class="aicon low">📋</div><div class="ainfo"><div class="aname">商業簡報 (kg_business_brief) <span style="color:var(--ok);font-size:10px;font-weight:700">✅ 已優化</span></div><div class="adesc">KG facts 直接餵入 MiniMax M2.1 合成（原 Claude Opus 已替換）</div><div class="abadges"><span class="abadge sched">每週一 06:00</span><span class="abadge" style="background:#f0f9ff;color:#0369a1">MiniMax（合成）</span></div></div><div class="acost low">🟢 低</div></div>
         <div class="arow"><div class="aicon none">📊</div><div class="ainfo"><div class="aname">KG 週度報告 (kg_weekly_report)</div><div class="adesc">純 Python 統計知識圖譜成長、缺口分析、導航排隊。無 AI 調用</div><div class="abadges"><span class="abadge sched">每週五 17:00</span><span class="abadge none">無 AI</span></div></div><div class="acost none">⚪ 零</div></div>
         <div class="arow"><div class="aicon none">💹</div><div class="ainfo"><div class="aname">定價監測 (kg_price_monitor)</div><div class="adesc">拉 UN Comtrade 官方 API 貿易量/單價，寫入時序庫。無 AI</div><div class="abadges"><span class="abadge sched">每週一 05:30</span><span class="abadge none">純 API，零 Token</span></div></div><div class="acost none">⚪ 零</div></div>
         <div class="arow"><div class="aicon none">🗄️</div><div class="ainfo"><div class="aname">政府資料備份 (gov_backup)</div><div class="adesc">增量下載 e-Stat + UN Comtrade 原始檔到本地封存。無 AI</div><div class="abadges"><span class="abadge sched">每月 1 日 05:00</span><span class="abadge none">純下載，零 Token</span></div></div><div class="acost none">⚪ 零</div></div>
@@ -215,33 +258,51 @@
         <div class="arow"><div class="aicon med">🏷️</div><div class="ainfo"><div class="aname">CEO 品牌研究觸發器</div><div class="adesc">在 brand_research_requests.md 新增 - [ ] 需求，autoloop Phase C.5 自動偵測啟動</div><div class="abadges"><span class="abadge user">CEO 寫檔觸發</span><span class="abadge haiku">Haiku（研究）</span></div></div><div class="acost med">🟡 中</div></div>
         <div class="arow"><div class="aicon low">🧠</div><div class="ainfo"><div class="aname">知識蒸餾 (distill_report.py)</div><div class="adesc">將研究報告蒸餾為三元組 facts 入庫，通常跟隨研究任務自動觸發</div><div class="abadges"><span class="abadge sched">研究後觸發</span><span class="abadge haiku">Haiku（蒸餾）</span></div></div><div class="acost low">🟢 低</div></div>
         <div class="arow"><div class="aicon low">⚡</div><div class="ainfo"><div class="aname">codex exec（臨時分析）</div><div class="adesc">對 Claude 結論做交叉驗證、大規模程式碼掃描。用戶或腳本觸發</div><div class="abadges"><span class="abadge user">用戶 / 腳本觸發</span><span class="abadge codex">Codex CLI</span></div></div><div class="acost low">🟢 低</div></div>
-        <h3 style="border-top:1px solid var(--line);margin-top:2px">📐 每日固定底線估算 <span class="tag">imac-main</span></h3>
+        <h3 style="border-top:1px solid var(--line);margin-top:2px">📐 每日固定底線估算 <span class="tag">優化後 · imac-main</span></h3>
         <div style="padding:4px 14px 12px">
           <table style="font-size:12px">
-            <thead><tr><th>來源</th><th>模型</th><th class="num">估算/次</th><th class="num">加權每日</th></tr></thead>
+            <thead><tr><th>來源</th><th>模型</th><th class="num">估算 Claude Token/日</th><th class="num">優化幅度</th></tr></thead>
             <tbody>
-              <tr><td>KG 自動閉環研究</td><td>Haiku</td><td class="num">~8M</td><td class="num" style="color:var(--danger);font-weight:800">~8M</td></tr>
-              <tr><td>雙軌 AI 日報</td><td>Sonnet</td><td class="num">~3M</td><td class="num" style="color:var(--warn)">~3M</td></tr>
-              <tr><td>KG 對抗自驗（5條）</td><td>Opus+Codex</td><td class="num">~300k/條</td><td class="num" style="color:var(--warn)">~1.5M</td></tr>
-              <tr><td>商業簡報</td><td>Opus</td><td class="num">~1M/週</td><td class="num" style="color:var(--ok)">~140k</td></tr>
-              <tr style="border-top:2px solid var(--line)"><td><strong>固定底線合計</strong></td><td>—</td><td class="num">—</td><td class="num" style="color:var(--danger);font-weight:800;font-size:13px">~12.6M/日</td></tr>
+              <tr style="text-decoration:line-through;color:var(--sub)"><td>KG 自動閉環研究（優化前）</td><td>Haiku</td><td class="num">~8M</td><td class="num"></td></tr>
+              <tr><td>→ KG 自動閉環研究（優化後）</td><td style="color:#0369a1;font-weight:700">MiniMax+Codex</td><td class="num" style="color:var(--ok)">~0</td><td class="num" style="color:var(--ok);font-weight:800">-8M ✅</td></tr>
+              <tr style="text-decoration:line-through;color:var(--sub)"><td>雙軌 AI 日報（優化前）</td><td>Sonnet</td><td class="num">~3M</td><td class="num"></td></tr>
+              <tr><td>→ 雙軌 AI 日報（優化後）</td><td style="color:#0369a1;font-weight:700">MiniMax+Codex</td><td class="num" style="color:var(--ok)">~0</td><td class="num" style="color:var(--ok);font-weight:800">-3M ✅</td></tr>
+              <tr><td>KG 對抗自驗（5條，保留）</td><td>Opus+Codex</td><td class="num" style="color:var(--warn)">~1.5M</td><td class="num">—</td></tr>
+              <tr style="text-decoration:line-through;color:var(--sub)"><td>商業簡報（優化前）</td><td>Opus</td><td class="num">~140k/日均</td><td class="num"></td></tr>
+              <tr><td>→ 商業簡報（優化後）</td><td style="color:#0369a1;font-weight:700">MiniMax</td><td class="num" style="color:var(--ok)">~0</td><td class="num" style="color:var(--ok);font-weight:800">-140k ✅</td></tr>
+              <tr><td>蒸餾入庫 (distill_report.py)</td><td>Haiku（保留）</td><td class="num" style="color:var(--ok)">~200k</td><td class="num">—</td></tr>
+              <tr style="border-top:2px solid var(--line)"><td><strong>優化後固定底線</strong></td><td>—</td><td class="num" style="color:var(--ok);font-weight:800;font-size:13px">~1.7M/日</td><td class="num" style="color:var(--ok);font-weight:800">節省 ~86%</td></tr>
             </tbody>
           </table>
           <div style="font-size:10.5px;color:var(--sub);margin-top:8px;line-height:1.5">
-            ⚠️ 若超出告警閾值，優先執行：<code>echo 0 &gt; ~/scripts/.research_quota</code>（停止每日研究，節省 ~8M/日）
+            ✅ 2026-06-28 起：macau_ai_daily / kg_autoloop 研究 / kg_business_brief 全面換用 Codex+MiniMax<br>
+            唯一保留 Claude 的排程任務：<strong>Opus 對抗自驗</strong>（決策推理必要）＋ <strong>Haiku 蒸餾</strong>（精確分類必要）
           </div>
         </div>
       </div>
     </div>
     <section class="panel">
-      <h2>💡 節流優化建議 <span class="tag">操作參考</span></h2>
+      <h2>✅ 已完成優化（2026-06-28）<span class="tag">Claude token -86%</span></h2>
       <table>
-        <thead><tr><th>建議</th><th class="num">預計節省</th><th>操作方式</th></tr></thead>
+        <thead><tr><th>優化項目</th><th>原模型</th><th>新模型</th><th class="num">節省/日</th></tr></thead>
         <tbody>
-          <tr><td>停止每日自動研究</td><td class="num" style="color:var(--danger)">~8M/日</td><td><code>echo 0 &gt; ~/scripts/.research_quota</code></td></tr>
-          <tr><td>autoloop 自驗從5條降到2條</td><td class="num" style="color:var(--warn)">~900k/日</td><td>修改 <code>kg_autoloop.sh</code> 的 <code>--limit 5</code> 為 <code>--limit 2</code></td></tr>
-          <tr><td>商業簡報改用 Sonnet 替代 Opus</td><td class="num" style="color:var(--ok)">~80%成本</td><td>修改 <code>kg_business_brief.py</code> 的 model 參數</td></tr>
-          <tr><td>macau_ai_daily 改每2日一次</td><td class="num" style="color:var(--warn)">~1.5M/日</td><td>修改 LaunchAgent plist 加 <code>Weekday</code> 條件</td></tr>
+          <tr><td>kg_autoloop Phase C 研究撰寫</td><td style="text-decoration:line-through;color:var(--sub)">Claude Haiku</td><td style="color:#0369a1;font-weight:700">Codex搜尋 + MiniMax撰寫</td><td class="num" style="color:var(--ok);font-weight:800">~8M</td></tr>
+          <tr><td>macau_ai_daily 日報撰寫</td><td style="text-decoration:line-through;color:var(--sub)">Claude Sonnet</td><td style="color:#0369a1;font-weight:700">Codex搜尋 + MiniMax撰寫</td><td class="num" style="color:var(--ok);font-weight:800">~3M</td></tr>
+          <tr><td>kg_business_brief 簡報合成</td><td style="text-decoration:line-through;color:var(--sub)">Claude Opus</td><td style="color:#0369a1;font-weight:700">MiniMax M2.1</td><td class="num" style="color:var(--ok)">~140k</td></tr>
+          <tr style="border-top:2px solid var(--line)"><td><strong>合計</strong></td><td>—</td><td>—</td><td class="num" style="color:var(--ok);font-weight:800;font-size:14px">~11.1M/日</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>🔮 後續優化計劃 <span class="tag">gstack + URL補源</span></h2>
+      <table>
+        <thead><tr><th>計劃</th><th>工具</th><th>狀態</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td>gstack browser 安裝</td><td><span class="abadge codex" style="font-size:11px">gstack</span></td><td>🟡 待執行</td><td>需安裝 Bun：<code>cd ~/automation-tools/gstack-clones/gstack &amp;&amp; ./setup</code></td></tr>
+          <tr><td>kg_url_sourcer.py 批量補 URL</td><td><span class="abadge codex" style="font-size:11px">gstack browse</span></td><td>🔲 待開發</td><td>12,445條無 URL facts → gstack browser 驗證 + 補源，目標業態域 0%→60%</td></tr>
+          <tr><td>autoloop 自驗降至2條/日</td><td>設定</td><td>🔲 可選</td><td><code>~/scripts/kg_autoloop.sh</code> 中 <code>--limit 5</code> 改 <code>--limit 2</code>（再省 ~900k/日）</td></tr>
+          <tr><td>macau_ai_daily 改每2日一次</td><td>LaunchAgent</td><td>🔲 可選</td><td>plist 加 Weekday 條件，每週5次→3次（MiniMax 下幾乎無成本，可暫不調）</td></tr>
         </tbody>
       </table>
     </section>
