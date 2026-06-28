@@ -443,9 +443,9 @@ async function load(){
     document.getElementById("quota").innerHTML = Object.entries(bySvc).map(([svc,m])=>{
       const man=m.manual; let usedPct,live=false,anchorTxt="";
       if(man&&man.cap){
-        // man.pct = 已用%（collect.py: pct = used/cap*100）
-        // 從錨點已用%出發，疊加今日增量（避免每日早上歸零假象）
-        const todayAdd = 100*(svcToday[svc]||0)/man.cap;
+        // 當日設錨：man.pct 已含今日用量，todayAdd 不能再加（否則雙重計算）
+        const anchorIsToday = man.anchor_date >= d;
+        const todayAdd = anchorIsToday ? 0 : 100*(svcToday[svc]||0)/man.cap;
         usedPct = man.pct + todayAdd; live=true;
         anchorTxt=`真值 剩${Math.round(100-man.pct)}%（校準 ${man.anchor_date||(man.recorded_at||'').slice(5,10)}）`;
       } else { usedPct=(man||m.auto).pct; }
