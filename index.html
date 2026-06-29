@@ -448,6 +448,11 @@ const today = () => new Date().toISOString().slice(0,10);
 const yesterday = () => new Date(Date.now()-864e5).toISOString().slice(0,10);
 async function q(path){ const r = await fetch(C.url+"/rest/v1/"+path,{headers:H}); return r.ok? r.json():[]; }
 
+async function safeLoad(fn){
+  try{ await fn(); }
+  catch(e){ document.getElementById("updated").textContent="刷新失敗 "+new Date().toLocaleTimeString("zh-HK",{hour:"2-digit",minute:"2-digit"}); }
+}
+
 /* ── 深色模式 ── */
 function toggleDark(){
   const dark = document.documentElement.getAttribute("data-theme")==="dark";
@@ -752,9 +757,11 @@ async function loadWeekly(){
     :`<div style="padding:14px 16px;color:var(--sub);font-size:13px">本週數據尚不足，明天再看趨勢更準確。</div>`;
 }
 
-load();
+function tick(){ if(curTab==="overview") safeLoad(load); else if(curTab==="charts") safeLoad(loadCharts); else if(curTab==="history") safeLoad(loadHistory); else if(curTab==="weekly") safeLoad(loadWeekly); }
+safeLoad(load);
 if(["charts","history","weekly"].includes(location.hash.slice(1))) showTab(location.hash.slice(1));
-setInterval(()=>{ if(curTab==="overview") load(); else if(curTab==="charts") loadCharts(); else if(curTab==="history") loadHistory(); else if(curTab==="weekly") loadWeekly(); },60000);
+setInterval(tick,60000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") tick(); });
 </script>
 </body>
 </html>
